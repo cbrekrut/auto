@@ -1,0 +1,8 @@
+version: '3.9'
+services:
+  web:
+    build: .
+    container_name: urgent-car-buy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
