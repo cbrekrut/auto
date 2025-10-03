@@ -1,13 +1,56 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-/**
- * Расширенная версия страницы "Срочный выкуп авто"
- * — добавлены секции о компании, причины выбора, документы, гарантии, отзывы,
- *   покрытие по городам, способы оплаты, разбор цены, расширенный FAQ и мини-сквозной CTA.
- * — улучшена валидация VIN и телефона, предпросмотр фото, мелкие UX-плюшки.
- *
- * Без внешних библиотек. Стили — utility-классы Tailwind.
- */
+const TG_BOT_TOKEN = "8451301143:AAECKF4ZGD5CaHgYWLJeL87-IDEqvw6BWlM";     
+const TG_CHAT_ID   = "543664962";
+
+async function sendTgMessage(payload) {
+  const msg = [
+    "📝 *Новая заявка на выкуп авто*",
+    "",
+    `Марка/модель: *${payload.make || "-"}* / *${payload.model || "-"}*`,
+    `Год: *${payload.year || "-"}*   Пробег: *${payload.mileage || "-"} км*`,
+    `Состояние: *${payload.condition || "-"}*   Город: *${payload.city || "-"}*`,
+    `Ориентировочная цена: *${(payload.price ?? "").toLocaleString?.("ru-RU") || "-"} ₽*`,
+    "",
+    `Имя: *${payload.name || "-"}*`,
+    `Телефон: *${payload.phone || "-"}*`,
+    payload.vin ? `VIN: \`${payload.vin}\`` : "",
+    payload.onCredit ? "Кредит: *да*" : "Кредит: нет",
+    payload.tradeIn ? "Trade-In: *да*" : "Trade-In: нет",
+    payload.comment ? `Комментарий:\n${payload.comment}` : "",
+  ].filter(Boolean).join("\n");
+
+  const resp = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TG_CHAT_ID,
+      text: msg,
+      parse_mode: "Markdown",
+      disable_web_page_preview: true,
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Telegram error: ${text}`);
+  }
+}
+async function sendTgPhoto(file, caption) {
+  const fd = new FormData();
+  fd.append("chat_id", TG_CHAT_ID);
+  fd.append("photo", file);
+  if (caption) {
+    fd.append("caption", caption);
+    fd.append("parse_mode", "Markdown");
+  }
+
+  const resp = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendPhoto`, {
+    method: "POST",
+    body: fd,
+  });
+  if (!resp.ok) throw new Error(await resp.text());
+}
 
 const MAKES = [
   "Toyota",
@@ -122,12 +165,11 @@ const Toggle = ({ label, checked, onChange }) => (
   </button>
 );
 
-// --- Расширенная логика оценки ---
 function computePriceDetailed({ make, model, year, mileage, condition }) {
   const y = Number(year);
   const now = new Date().getFullYear();
   const age = Number.isFinite(y) ? Math.max(0, now - y) : 0;
-  const baseByYear = Number.isFinite(y) ? Math.max(150000, 1500000 - age * 70000) : 200000;
+  const baseByYear = Number.isFinite(y) ? Math.max(240000, 1500000 - age * 70000) : 200000;
 
   const m = Number(mileage);
   const mileageAdj = !Number.isFinite(m)
@@ -141,7 +183,7 @@ function computePriceDetailed({ make, model, year, mileage, condition }) {
     : 0.75;
 
   const conditionMap = {
-    excellent: 1.1,
+    excellent: 1.3,
     good: 1,
     fair: 0.9,
     needs_repair: 0.75,
@@ -149,7 +191,7 @@ function computePriceDetailed({ make, model, year, mileage, condition }) {
   };
   const condAdj = conditionMap[condition] ?? 1;
 
-  const makeAdj = make && ["BMW", "Mercedes-Benz", "Audi", "Lexus"].includes(make) ? 1.12 : 1;
+  const makeAdj = make && ["BMW", "Mercedes-Benz", "Audi", "Lexus"].includes(make) ? 1.35 : 1;
   const modelAdj = model && /AMG|M\d|RS|SRT/i.test(model) ? 1.15 : 1;
 
   const raw = Math.round(baseByYear * mileageAdj * condAdj * makeAdj * modelAdj);
@@ -198,9 +240,8 @@ const PhoneMask = ({ value, onChange }) => {
 };
 
 function useVinValidation(vin) {
-  // VIN: 17 символов, исключая I,O,Q
   const clean = (vin || "").toUpperCase();
-  const validChars = /^[A-HJ-NPR-Z0-9]{0,17}$/; // без I,O,Q
+  const validChars = /^[A-HJ-NPR-Z0-9]{0,17}$/;
   const isFormatValid = validChars.test(clean) && (clean.length === 0 || clean.length === 17);
   return { clean, isFormatValid, isComplete: clean.length === 17 };
 }
@@ -272,7 +313,6 @@ export default function UrgentCarBuyPage() {
     setFiles((prev) => [...prev, ...safe]);
   };
 
-  // генерируем превью для изображений
   useEffect(() => {
     const urls = files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
     setPreviews(urls);
@@ -283,13 +323,30 @@ export default function UrgentCarBuyPage() {
 
   const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx));
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-    if (Object.keys(errors).length > 0) return;
-    // Здесь отправка на бэкенд (fetch/axios)
+  const onSubmit = async (e) => {
+  e.preventDefault();
+  setSubmitted(true);
+  if (Object.keys(errors).length > 0) return;
+
+  try {
+    await sendTgMessage({
+      ...form,
+      price,
+    });
+
+    if (files?.length) {
+      const cap = `Фото к заявке: ${form.make} ${form.model} ${form.year || ""}`;
+      for (const f of files.slice(0, 3)) {
+        await sendTgPhoto(f, cap);
+      }
+    }
+
     alert("Заявка отправлена! С вами свяжется наш эксперт в течение 10 минут.");
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Не удалось отправить заявку в Telegram.");
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-white">
@@ -299,7 +356,7 @@ export default function UrgentCarBuyPage() {
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-emerald-400/20 border border-emerald-300/30 flex items-center justify-center font-black">$</div>
             <div>
-              <div className="font-bold leading-tight">Срочный выкуп авто</div>
+              <div className="font-bold leading-tight">Главный Автовыкуп Тверь</div>
               <div className="text-xs opacity-70">Оценка за 2 минуты — выплата за 1 час</div>
             </div>
           </div>
@@ -324,7 +381,7 @@ export default function UrgentCarBuyPage() {
               <Tag>Документы в порядке</Tag>
             </div>
             <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
-              <Stat value="> 12 000" label="выкупленных авто" />
+              <Stat value="> 2 000" label="выкупленных авто" />
               <Stat value="1 час" label="от заявки до выплаты" />
               <Stat value="4.9/5" label="рейтинг клиентов" />
             </div>
@@ -494,7 +551,7 @@ export default function UrgentCarBuyPage() {
           {CITIES.map((c, i) => (
             <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
               <div className="font-medium">{c}</div>
-              <div className="text-xs opacity-70">≈ 60–90 мин</div>
+              <div className="text-xs opacity-70">≈ 20–180 мин</div>
             </div>
           ))}
         </div>
