@@ -1,8 +1,13 @@
-version: '3.9'
+version: "3.9"
+
 services:
-  web:
-    build: .
-    container_name: urgent-car-buy
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auto-frontend:latest
+    container_name: auto_frontend
     ports:
-      - "8080:80"
+      - "80:80"  
     restart: unless-stopped
+  
