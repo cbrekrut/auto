@@ -643,14 +643,13 @@ export default function UrgentCarBuyPage() {
       <footer className="border-t border-white/10 py-10 text-sm opacity-80">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-6">
           <div>
-            <div className="font-semibold">ООО «Автовыкуп»</div>
-            <div>ИНН 7700000000</div>
+            <div className="font-semibold">Срочный автовыкуп авто в Твери, СПб и Московской области</div>
             <div>Работаем по договору купли-продажи. © {new Date().getFullYear()}</div>
           </div>
           <div>
             <div>График: 24/7</div>
-            <div>Тел.: +7 (999) 000-00-00</div>
-            <div>Email: buy@auto.example</div>
+            <div>Тел.: +7 (965) 432-01-57</div>
+            <div></div>
           </div>
           <div>
             <div>Политика конфиденциальности</div>
