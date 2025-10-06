@@ -7,21 +7,16 @@ services:
     container_name: auto_frontend
     ports:
       - "80:80"
-      - "443:443"                
+      - "443:443"
     restart: unless-stopped
     volumes:
-      - certbot-www:/var/www/certbot        
-      - letsencrypt:/etc/letsencrypt:ro     
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro   # будем подменять файл
+      - ./.certbot-www:/var/www/certbot
+      - ./.letsencrypt:/etc/letsencrypt:ro
 
   certbot:
     image: certbot/certbot:latest
     container_name: auto_certbot
-    depends_on:
-      - frontend
     volumes:
-      - certbot-www:/var/www/certbot       
-      - letsencrypt:/etc/letsencrypt       
-
-volumes:
-  certbot-www:
-  letsencrypt:
+      - ./.certbot-www:/var/www/certbot
+      - ./.letsencrypt:/etc/letsencrypt
