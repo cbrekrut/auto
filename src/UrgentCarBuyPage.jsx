@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const TG_BOT_TOKEN = "8451301143:AAECKF4ZGD5CaHgYWLJeL87-IDEqvw6BWlM";     
 const TG_CHAT_ID   = "737031292";
-
+async function TestFoo() {
+  
+}
 async function sendTgMessage(payload) {
   const msg = [
     "📝 *Новая заявка на выкуп авто*",
